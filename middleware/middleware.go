@@ -20,10 +20,12 @@ const (
 	bucket = "fam-photos-photos"
 )
 
+// AWSContext represents AWS session.
 type AWSContext struct {
 	session session.Session
 }
 
+// OpenSession creates a session with AWS.
 func (a *AWSContext) OpenSession() {
 	sess, _ := session.NewSession(&aws.Config{
 		Region: aws.String("eu-west-2"),
@@ -43,6 +45,7 @@ func exitErrorf(msg string, args ...interface{}) {
 	os.Exit(1)
 }
 
+// GetFirstName connects to AWS Dynamo DB to get the user's first name.
 func GetFirstName(w http.ResponseWriter, r *http.Request) {
 
 	var username interface{}
@@ -70,6 +73,7 @@ func GetFirstName(w http.ResponseWriter, r *http.Request) {
 	encoder.Encode(user.FirstName)
 }
 
+// GetFamilies connects to AWS Dynamo DB to get the families to which the user belongs.
 func GetFamilies(w http.ResponseWriter, r *http.Request) {
 
 	var username interface{}
@@ -98,7 +102,8 @@ func GetFamilies(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetImageURLsByFamily(w http.ResponseWriter, r *http.Request) {
+// GetImageDataByFamily connects to AWS S3 to get the images for the given family.
+func GetImageDataByFamily(w http.ResponseWriter, r *http.Request) {
 
 	svc := s3.New(&context.session)
 
@@ -113,23 +118,50 @@ func GetImageURLsByFamily(w http.ResponseWriter, r *http.Request) {
 		exitErrorf("Unable to list items in bucket %q, %v", bucket, err)
 	}
 
-	urls := []string{}
+	imagesData := []models.ImageData{}
 
 	for _, item := range response.Contents {
+
+		imageData := models.ImageData{}
 
 		// Exclude the folder object from results
 		if strings.HasSuffix(*item.Key, "/") {
 			continue
 		}
 
+		response, err := svc.GetObjectTagging(&s3.GetObjectTaggingInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(*item.Key),
+		})
+
+		if err != nil {
+			exitErrorf("Unable to retrive item %q from bucket %q, %v", *item.Key, bucket, err)
+		}
+
+		for _, tag := range response.TagSet {
+			if *tag.Key == "caption" {
+				imageData.Caption = *tag.Value
+			}
+		}
+
 		imageURL := fmt.Sprintf("%s%s", s3URL, *item.Key)
 		imageURL = strings.ReplaceAll(imageURL, " ", "%20")
-		fmt.Println("URL", imageURL)
-		urls = append(urls, imageURL)
+
+		imageData.URL = imageURL
+
+		imagesData = append(imagesData, imageData)
+	}
+
+	x := []map[string]string{}
+	for _, imageData := range imagesData {
+		d := map[string]string{}
+		d["url"] = imageData.URL
+		d["caption"] = imageData.Caption
+		x = append(x, d)
 	}
 
 	w.Header().Set("content-type", "application/json")
 	encoder := json.NewEncoder(w)
-	encoder.Encode(urls)
+	encoder.Encode(x)
 
 }
