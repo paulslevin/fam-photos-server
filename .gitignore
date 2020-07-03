@@ -7,3 +7,5 @@
 # go.mod/sum files
 go.mod
 go.sum
+
+*.zip
