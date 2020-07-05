@@ -94,8 +94,6 @@ func GetImageDataByFamily(w http.ResponseWriter, r *http.Request) {
 	}
 
 	numberOfImages := len(response.Contents)
-	fmt.Println("number of images", numberOfImages)
-
 	// Here we make the buffer size numberOfImages - 1 since we don't include
 	// the enclosing family folder
 	imageChan := make(chan models.ImageData, numberOfImages-1)
