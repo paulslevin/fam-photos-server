@@ -129,19 +129,17 @@ func GetImageDataByFamily(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		response, err := svc.GetObjectTagging(&s3.GetObjectTaggingInput{
+		response, err := svc.HeadObject(&s3.HeadObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(*item.Key),
 		})
 
 		if err != nil {
-			exitErrorf("Unable to retrive item %q from bucket %q, %v", *item.Key, bucket, err)
+			exitErrorf("Unable to retrieve item %q from bucket %q, %v", *item.Key, bucket, err)
 		}
 
-		for _, tag := range response.TagSet {
-			if *tag.Key == "caption" {
-				imageData.Caption = *tag.Value
-			}
+		if caption, ok := response.Metadata["Caption"]; ok {
+			imageData.Caption = *caption
 		}
 
 		imageURL := fmt.Sprintf("%s%s", s3URL, *item.Key)
